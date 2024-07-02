@@ -1,5 +1,6 @@
 import contextlib
 import logging
+import os
 import time
 import urllib.parse
 
@@ -75,19 +76,16 @@ class Login:
                     By.ID, "idRemoteNGC_DisplaySign"
                 ).get_attribute("innerHTML")
                 logging.error(f"[LOGIN] 2FA code: {code}")
-            logging.info("[LOGIN] Press enter when confirmed on your device...")
-            input()
+            if os.environ.get("DOCKER"):
+                dockerWaitTime = 15
+                logging.info(
+                    "[LOGIN] Waiting " + str(dockerWaitTime) + " seconds for 2FA..."
+                )
+                time.sleep(dockerWaitTime)
+            else:
+                logging.info("[LOGIN] Press enter when confirmed on your device...")
+                input()
 
-        try:
-            self.utils.waitUntilVisible(
-                By.NAME, 'iProofEmail', 0.5
-            )
-            logging.error('[LOGIN] Needs you to prove email')
-            logging.info('[LOGIN] Press enter when confirmed...')
-            input()
-        except Exception:
-            logging.info('[LOGIN] No email proof, all clear')
-        
         while not (
             urllib.parse.urlparse(self.webdriver.current_url).path == "/"
             and urllib.parse.urlparse(self.webdriver.current_url).hostname
@@ -109,6 +107,9 @@ class Login:
     def enterPassword(self, password):
         self.utils.waitUntilClickable(By.NAME, "passwd", 10)
         self.utils.waitUntilClickable(By.ID, "idSIButton9", 10)
+        # browser.webdriver.find_element(By.NAME, "passwd").send_keys(password)
+        # If password contains special characters like " ' or \, send_keys() will not work
+        password = password.replace("\\", "\\\\").replace('"', '\\"')
 
         logging.info("[LOGIN] " + "Writing password...")
 

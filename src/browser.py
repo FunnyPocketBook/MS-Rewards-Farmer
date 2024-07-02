@@ -1,12 +1,12 @@
 import contextlib
 import logging
+import os
 import random
 from pathlib import Path
 from typing import Any
 
 import ipapi
 import seleniumwire.undetected_chromedriver as webdriver
-from selenium.webdriver import ChromeOptions
 from selenium.webdriver.chrome.webdriver import WebDriver
 
 from src.userAgentGenerator import GenerateUserAgent
@@ -67,6 +67,9 @@ class Browser:
         options.add_argument("--ignore-certificate-errors")
         options.add_argument("--ignore-certificate-errors-spki-list")
         options.add_argument("--ignore-ssl-errors")
+        if os.environ.get("DOCKER"):
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-extensions")
         options.add_argument("--dns-prefetch-disable")
@@ -84,17 +87,20 @@ class Browser:
                 "https": self.proxy,
                 "no_proxy": "localhost,127.0.0.1",
             }
-
-        # Obtain webdriver chrome driver version
-        version = self.getChromeVersion()
-        major = int(version.split(".")[0])
-
-        driver = webdriver.Chrome(
-            options=options,
-            seleniumwire_options=seleniumwireOptions,
-            user_data_dir=self.userDataDir.as_posix(),
-            version_main=major,
-        )
+        driver = None
+        if os.environ.get("DOCKER"):
+            driver = webdriver.Chrome(
+                options=options,
+                seleniumwire_options=seleniumwireOptions,
+                user_data_dir=self.userDataDir.as_posix(),
+                driver_executable_path="/usr/bin/chromedriver",
+            )
+        else:
+            driver = webdriver.Chrome(
+                options=options,
+                seleniumwire_options=seleniumwireOptions,
+                user_data_dir=self.userDataDir.as_posix(),
+            )
 
         seleniumLogger = logging.getLogger("seleniumwire")
         seleniumLogger.setLevel(logging.ERROR)
@@ -196,14 +202,3 @@ class Browser:
             except Exception:  # pylint: disable=broad-except
                 return ("en", "US")
         return (lang, geo)
-
-    def getChromeVersion(self) -> str:
-        chrome_options = ChromeOptions()
-        chrome_options.add_argument("--headless=new")
-        chrome_options.add_argument("--no-sandbox")
-        driver = WebDriver(options=chrome_options)
-        version = driver.capabilities["browserVersion"]
-
-        driver.quit()
-
-        return version
